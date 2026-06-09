@@ -32,6 +32,9 @@ jobs:
         id: login-ecr
         uses: aws-actions/amazon-ecr-login@v2
 
+      - name: Ver estructura de archivos
+        run: find . -name "Dockerfile*" | head -20
+
       - name: Build y Push Frontend
         working-directory: "proyecto semestral"
         run: |
