@@ -33,8 +33,8 @@ jobs:
         uses: aws-actions/amazon-ecr-login@v2
 
       - name: Build y Push Frontend
+        working-directory: "proyecto semestral"
         run: |
-          cd "proyecto semestral"
           docker build \
             --build-arg VITE_API_URL=http://${{ secrets.ALB_DNS }} \
             -f Dockerfile.front \
@@ -45,8 +45,8 @@ jobs:
           docker push ${{ env.ECR_REGISTRY }}/innovatech-frontend:${{ github.sha }}
 
       - name: Build y Push Backend Despachos
+        working-directory: "proyecto semestral"
         run: |
-          cd "proyecto semestral"
           docker build \
             -f Dockerfile.back-despachos \
             -t ${{ env.ECR_REGISTRY }}/innovatech-back-despachos:latest \
@@ -56,8 +56,8 @@ jobs:
           docker push ${{ env.ECR_REGISTRY }}/innovatech-back-despachos:${{ github.sha }}
 
       - name: Build y Push Backend Ventas
+        working-directory: "proyecto semestral"
         run: |
-          cd "proyecto semestral"
           docker build \
             -f Dockerfile.back-ventas \
             -t ${{ env.ECR_REGISTRY }}/innovatech-back-ventas:latest \
