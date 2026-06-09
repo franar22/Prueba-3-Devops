@@ -1,0 +1,92 @@
+version: '3.8'
+
+services:
+
+  # ─── Base de datos MySQL local (solo para desarrollo) ───────────────────────
+  mysql:
+    image: mysql:8.0
+    container_name: mysql-db
+    restart: unless-stopped
+    environment:
+      MYSQL_ROOT_PASSWORD: rootpassword
+      MYSQL_DATABASE: innovatech
+      MYSQL_USER: appuser
+      MYSQL_PASSWORD: apppassword
+    ports:
+      - "3306:3306"
+    volumes:
+      - mysql_data:/var/lib/mysql
+    networks:
+      - innovatech-net
+    healthcheck:
+      test: ["CMD", "mysqladmin", "ping", "-h", "localhost"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  # ─── Backend Despachos (puerto 8081) ────────────────────────────────────────
+  back-despachos:
+    build:
+      context: ./back-Despachos_SpringBoot/Springboot-API-REST-DESPACHO
+      dockerfile: ../../Dockerfile.back-despachos
+    container_name: back-despachos
+    restart: unless-stopped
+    environment:
+      DB_ENDPOINT: mysql
+      DB_PORT: 3306
+      DB_NAME: innovatech
+      DB_USERNAME: appuser
+      DB_PASSWORD: apppassword
+    ports:
+      - "8081:8081"
+    depends_on:
+      mysql:
+        condition: service_healthy
+    networks:
+      - innovatech-net
+
+  # ─── Backend Ventas (puerto 8080) ───────────────────────────────────────────
+  back-ventas:
+    build:
+      context: ./back-Ventas_SpringBoot/Springboot-API-REST
+      dockerfile: ../../Dockerfile.back-ventas
+    container_name: back-ventas
+    restart: unless-stopped
+    environment:
+      DB_ENDPOINT: mysql
+      DB_PORT: 3306
+      DB_NAME: innovatech
+      DB_USERNAME: appuser
+      DB_PASSWORD: apppassword
+    ports:
+      - "8080:8080"
+    depends_on:
+      mysql:
+        condition: service_healthy
+    networks:
+      - innovatech-net
+
+  # ─── Frontend React + Vite (puerto 80) ──────────────────────────────────────
+  frontend:
+    build:
+      context: ./front_despacho
+      dockerfile: ../Dockerfile.front
+      args:
+        # En producción (ECS) esto apunta al ALB. Localmente apunta a los contenedores.
+        VITE_API_URL: http://localhost
+    container_name: frontend
+    restart: unless-stopped
+    ports:
+      - "80:80"
+    depends_on:
+      - back-despachos
+      - back-ventas
+    networks:
+      - innovatech-net
+
+networks:
+  innovatech-net:
+    driver: bridge
+
+volumes:
+  mysql_data:
