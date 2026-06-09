@@ -36,30 +36,30 @@ jobs:
         run: |
           docker build \
             --build-arg VITE_API_URL=http://${{ secrets.ALB_DNS }} \
-            -f Dockerfile.front \
+            -f "./proyecto semestral/Dockerfile.front" \
             -t ${{ env.ECR_REGISTRY }}/innovatech-frontend:latest \
             -t ${{ env.ECR_REGISTRY }}/innovatech-frontend:${{ github.sha }} \
-            ./front_despacho
+            "./proyecto semestral/front_despacho"
           docker push ${{ env.ECR_REGISTRY }}/innovatech-frontend:latest
           docker push ${{ env.ECR_REGISTRY }}/innovatech-frontend:${{ github.sha }}
 
       - name: Build y Push Backend Despachos
         run: |
           docker build \
-            -f Dockerfile.back-despachos \
+            -f "./proyecto semestral/Dockerfile.back-despachos" \
             -t ${{ env.ECR_REGISTRY }}/innovatech-back-despachos:latest \
             -t ${{ env.ECR_REGISTRY }}/innovatech-back-despachos:${{ github.sha }} \
-            ./back-Despachos_SpringBoot/Springboot-API-REST-DESPACHO
+            "./proyecto semestral/back-Despachos_SpringBoot/Springboot-API-REST-DESPACHO"
           docker push ${{ env.ECR_REGISTRY }}/innovatech-back-despachos:latest
           docker push ${{ env.ECR_REGISTRY }}/innovatech-back-despachos:${{ github.sha }}
 
       - name: Build y Push Backend Ventas
         run: |
           docker build \
-            -f Dockerfile.back-ventas \
+            -f "./proyecto semestral/Dockerfile.back-ventas" \
             -t ${{ env.ECR_REGISTRY }}/innovatech-back-ventas:latest \
             -t ${{ env.ECR_REGISTRY }}/innovatech-back-ventas:${{ github.sha }} \
-            ./back-Ventas_SpringBoot/Springboot-API-REST
+            "./proyecto semestral/back-Ventas_SpringBoot/Springboot-API-REST"
           docker push ${{ env.ECR_REGISTRY }}/innovatech-back-ventas:latest
           docker push ${{ env.ECR_REGISTRY }}/innovatech-back-ventas:${{ github.sha }}
 
