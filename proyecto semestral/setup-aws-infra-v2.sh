@@ -2,6 +2,7 @@
 # ============================================================
 # setup-aws-infra.sh
 # Crea VPC, subredes, internet gateway, security groups y ALB
+export AWS_PAGER=""
 # para el proyecto EP3 - Innovatech Chile
 #
 # USO:
@@ -28,7 +29,7 @@ echo "================================================"
 # ─── 1. VPC ───────────────────────────────────────────────────────────────────
 echo ""
 echo "[1/8] Creando VPC..."
-VPC_ID=$(aws ec2 create-vpc \
+VPC_ID=$(aws ec2 --no-cli-pager create-vpc \
   --cidr-block 10.0.0.0/16 \
   --region $REGION \
   --tag-specifications "ResourceType=vpc,Tags=[{Key=Name,Value=$PROJECT-vpc},{Key=Project,Value=$PROJECT}]" \
@@ -36,28 +37,28 @@ VPC_ID=$(aws ec2 create-vpc \
   --output text)
 
 # Habilitar DNS hostnames (necesario para ECS y RDS)
-aws ec2 modify-vpc-attribute --vpc-id $VPC_ID --enable-dns-hostnames
-aws ec2 modify-vpc-attribute --vpc-id $VPC_ID --enable-dns-support
+aws ec2 --no-cli-pager modify-vpc-attribute --vpc-id $VPC_ID --enable-dns-hostnames
+aws ec2 --no-cli-pager modify-vpc-attribute --vpc-id $VPC_ID --enable-dns-support
 
 echo "  VPC creada: $VPC_ID"
 
 # ─── 2. INTERNET GATEWAY ──────────────────────────────────────────────────────
 echo ""
 echo "[2/8] Creando Internet Gateway..."
-IGW_ID=$(aws ec2 create-internet-gateway \
+IGW_ID=$(aws ec2 --no-cli-pager create-internet-gateway \
   --region $REGION \
   --tag-specifications "ResourceType=internet-gateway,Tags=[{Key=Name,Value=$PROJECT-igw}]" \
   --query 'InternetGateway.InternetGatewayId' \
   --output text)
 
-aws ec2 attach-internet-gateway --internet-gateway-id $IGW_ID --vpc-id $VPC_ID
+aws ec2 --no-cli-pager attach-internet-gateway --internet-gateway-id $IGW_ID --vpc-id $VPC_ID
 echo "  Internet Gateway: $IGW_ID"
 
 # ─── 3. SUBREDES PÚBLICAS (2 AZs para alta disponibilidad) ───────────────────
 echo ""
 echo "[3/8] Creando subredes públicas en 2 zonas de disponibilidad..."
 
-SUBNET_PUB_1=$(aws ec2 create-subnet \
+SUBNET_PUB_1=$(aws ec2 --no-cli-pager create-subnet \
   --vpc-id $VPC_ID \
   --cidr-block 10.0.1.0/24 \
   --availability-zone ${REGION}a \
@@ -66,7 +67,7 @@ SUBNET_PUB_1=$(aws ec2 create-subnet \
   --query 'Subnet.SubnetId' \
   --output text)
 
-SUBNET_PUB_2=$(aws ec2 create-subnet \
+SUBNET_PUB_2=$(aws ec2 --no-cli-pager create-subnet \
   --vpc-id $VPC_ID \
   --cidr-block 10.0.2.0/24 \
   --availability-zone ${REGION}b \
@@ -76,8 +77,8 @@ SUBNET_PUB_2=$(aws ec2 create-subnet \
   --output text)
 
 # Habilitar IP pública automática en subredes públicas
-aws ec2 modify-subnet-attribute --subnet-id $SUBNET_PUB_1 --map-public-ip-on-launch
-aws ec2 modify-subnet-attribute --subnet-id $SUBNET_PUB_2 --map-public-ip-on-launch
+aws ec2 --no-cli-pager modify-subnet-attribute --subnet-id $SUBNET_PUB_1 --map-public-ip-on-launch
+aws ec2 --no-cli-pager modify-subnet-attribute --subnet-id $SUBNET_PUB_2 --map-public-ip-on-launch
 
 echo "  Subred pública 1 (us-east-1a): $SUBNET_PUB_1"
 echo "  Subred pública 2 (us-east-1b): $SUBNET_PUB_2"
@@ -85,7 +86,7 @@ echo "  Subred pública 2 (us-east-1b): $SUBNET_PUB_2"
 # ─── 4. ROUTE TABLE ───────────────────────────────────────────────────────────
 echo ""
 echo "[4/8] Configurando tabla de rutas..."
-RT_ID=$(aws ec2 create-route-table \
+RT_ID=$(aws ec2 --no-cli-pager create-route-table \
   --vpc-id $VPC_ID \
   --region $REGION \
   --tag-specifications "ResourceType=route-table,Tags=[{Key=Name,Value=$PROJECT-rt-public}]" \
@@ -93,17 +94,17 @@ RT_ID=$(aws ec2 create-route-table \
   --output text)
 
 # Ruta por defecto hacia internet
-aws ec2 create-route --route-table-id $RT_ID --destination-cidr-block 0.0.0.0/0 --gateway-id $IGW_ID
+aws ec2 --no-cli-pager create-route --route-table-id $RT_ID --destination-cidr-block 0.0.0.0/0 --gateway-id $IGW_ID
 
 # Asociar subredes a la route table
-aws ec2 associate-route-table --route-table-id $RT_ID --subnet-id $SUBNET_PUB_1
-aws ec2 associate-route-table --route-table-id $RT_ID --subnet-id $SUBNET_PUB_2
+aws ec2 --no-cli-pager associate-route-table --route-table-id $RT_ID --subnet-id $SUBNET_PUB_1
+aws ec2 --no-cli-pager associate-route-table --route-table-id $RT_ID --subnet-id $SUBNET_PUB_2
 echo "  Route table configurada: $RT_ID"
 
 # ─── 5. SECURITY GROUP: ALB (acepta tráfico HTTP/HTTPS desde internet) ────────
 echo ""
 echo "[5/8] Creando Security Group para el ALB..."
-SG_ALB=$(aws ec2 create-security-group \
+SG_ALB=$(aws ec2 --no-cli-pager create-security-group \
   --group-name "$PROJECT-sg-alb" \
   --description "SG para Application Load Balancer - $PROJECT" \
   --vpc-id $VPC_ID \
@@ -113,10 +114,10 @@ SG_ALB=$(aws ec2 create-security-group \
   --output text)
 
 # HTTP desde cualquier IP
-aws ec2 authorize-security-group-ingress --group-id $SG_ALB \
+aws ec2 --no-cli-pager authorize-security-group-ingress --group-id $SG_ALB \
   --protocol tcp --port 80 --cidr 0.0.0.0/0
 # HTTPS desde cualquier IP
-aws ec2 authorize-security-group-ingress --group-id $SG_ALB \
+aws ec2 --no-cli-pager authorize-security-group-ingress --group-id $SG_ALB \
   --protocol tcp --port 443 --cidr 0.0.0.0/0
 
 echo "  SG ALB: $SG_ALB"
@@ -124,7 +125,7 @@ echo "  SG ALB: $SG_ALB"
 # ─── 6. SECURITY GROUP: ECS Tasks (acepta tráfico solo desde el ALB) ──────────
 echo ""
 echo "[6/8] Creando Security Group para los contenedores ECS..."
-SG_ECS=$(aws ec2 create-security-group \
+SG_ECS=$(aws ec2 --no-cli-pager create-security-group \
   --group-name "$PROJECT-sg-ecs" \
   --description "SG para tareas ECS Fargate - $PROJECT" \
   --vpc-id $VPC_ID \
@@ -134,16 +135,16 @@ SG_ECS=$(aws ec2 create-security-group \
   --output text)
 
 # Frontend (puerto 80) solo desde el ALB
-aws ec2 authorize-security-group-ingress --group-id $SG_ECS \
+aws ec2 --no-cli-pager authorize-security-group-ingress --group-id $SG_ECS \
   --protocol tcp --port 80 --source-group $SG_ALB
 # Backend Ventas (8080) solo desde el ALB y otros contenedores ECS
-aws ec2 authorize-security-group-ingress --group-id $SG_ECS \
+aws ec2 --no-cli-pager authorize-security-group-ingress --group-id $SG_ECS \
   --protocol tcp --port 8080 --source-group $SG_ALB
 # Backend Despachos (8081) solo desde el ALB y otros contenedores ECS
-aws ec2 authorize-security-group-ingress --group-id $SG_ECS \
+aws ec2 --no-cli-pager authorize-security-group-ingress --group-id $SG_ECS \
   --protocol tcp --port 8081 --source-group $SG_ALB
 # Comunicación interna entre contenedores ECS
-aws ec2 authorize-security-group-ingress --group-id $SG_ECS \
+aws ec2 --no-cli-pager authorize-security-group-ingress --group-id $SG_ECS \
   --protocol tcp --port 0-65535 --source-group $SG_ECS
 
 echo "  SG ECS: $SG_ECS"
@@ -151,7 +152,7 @@ echo "  SG ECS: $SG_ECS"
 # ─── 7. SECURITY GROUP: RDS MySQL ─────────────────────────────────────────────
 echo ""
 echo "[7/8] Creando Security Group para RDS MySQL..."
-SG_RDS=$(aws ec2 create-security-group \
+SG_RDS=$(aws ec2 --no-cli-pager create-security-group \
   --group-name "$PROJECT-sg-rds" \
   --description "SG para RDS MySQL - $PROJECT" \
   --vpc-id $VPC_ID \
@@ -161,7 +162,7 @@ SG_RDS=$(aws ec2 create-security-group \
   --output text)
 
 # MySQL (3306) solo desde los contenedores ECS
-aws ec2 authorize-security-group-ingress --group-id $SG_RDS \
+aws ec2 --no-cli-pager authorize-security-group-ingress --group-id $SG_RDS \
   --protocol tcp --port 3306 --source-group $SG_ECS
 
 echo "  SG RDS: $SG_RDS"
@@ -169,7 +170,7 @@ echo "  SG RDS: $SG_RDS"
 # ─── 8. APPLICATION LOAD BALANCER ─────────────────────────────────────────────
 echo ""
 echo "[8/8] Creando Application Load Balancer..."
-ALB_ARN=$(aws elbv2 create-load-balancer \
+ALB_ARN=$(aws elbv2 --no-cli-pager create-load-balancer \
   --name "$PROJECT-alb" \
   --subnets $SUBNET_PUB_1 $SUBNET_PUB_2 \
   --security-groups $SG_ALB \
@@ -181,7 +182,7 @@ ALB_ARN=$(aws elbv2 create-load-balancer \
   --query 'LoadBalancers[0].LoadBalancerArn' \
   --output text)
 
-ALB_DNS=$(aws elbv2 describe-load-balancers \
+ALB_DNS=$(aws elbv2 --no-cli-pager describe-load-balancers \
   --load-balancer-arns $ALB_ARN \
   --query 'LoadBalancers[0].DNSName' \
   --output text)
@@ -189,7 +190,7 @@ ALB_DNS=$(aws elbv2 describe-load-balancers \
 echo "  ALB creado: $ALB_DNS"
 
 # Target Group para el Frontend
-TG_FRONT_ARN=$(aws elbv2 create-target-group \
+TG_FRONT_ARN=$(aws elbv2 --no-cli-pager create-target-group \
   --name "$PROJECT-tg-frontend" \
   --protocol HTTP \
   --port 80 \
@@ -203,7 +204,7 @@ TG_FRONT_ARN=$(aws elbv2 create-target-group \
   --output text)
 
 # Target Group para Backend Despachos
-TG_DESPACHOS_ARN=$(aws elbv2 create-target-group \
+TG_DESPACHOS_ARN=$(aws elbv2 --no-cli-pager create-target-group \
   --name "$PROJECT-tg-despachos" \
   --protocol HTTP \
   --port 8081 \
@@ -217,7 +218,7 @@ TG_DESPACHOS_ARN=$(aws elbv2 create-target-group \
   --output text)
 
 # Target Group para Backend Ventas
-TG_VENTAS_ARN=$(aws elbv2 create-target-group \
+TG_VENTAS_ARN=$(aws elbv2 --no-cli-pager create-target-group \
   --name "$PROJECT-tg-ventas" \
   --protocol HTTP \
   --port 8080 \
@@ -231,7 +232,7 @@ TG_VENTAS_ARN=$(aws elbv2 create-target-group \
   --output text)
 
 # Listener HTTP en puerto 80 → Frontend por defecto
-aws elbv2 create-listener \
+aws elbv2 --no-cli-pager create-listener \
   --load-balancer-arn $ALB_ARN \
   --protocol HTTP \
   --port 80 \
