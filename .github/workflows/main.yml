@@ -12,9 +12,6 @@ env:
   ECS_CLUSTER: innovatech-cluster
 
 jobs:
-  # ─────────────────────────────────────────────────────────────────
-  # JOB 1: Build y Push de imágenes a ECR
-  # ─────────────────────────────────────────────────────────────────
   build-and-push:
     name: Build & Push a ECR
     runs-on: ubuntu-latest
@@ -35,50 +32,37 @@ jobs:
         id: login-ecr
         uses: aws-actions/amazon-ecr-login@v2
 
-      # ── Frontend ────────────────────────────────────────────────
-      - name: Build imagen Frontend
-        uses: docker/build-push-action@v5
-        with:
-          context: ./front_despacho
-          file: ./Dockerfile.front
-          push: true
-          tags: |
-            ${{ env.ECR_REGISTRY }}/innovatech-frontend:latest
-            ${{ env.ECR_REGISTRY }}/innovatech-frontend:${{ github.sha }}
-          build-args: |
-            VITE_API_URL=http://${{ secrets.ALB_DNS }}
-          cache-from: type=gha
-          cache-to: type=gha,mode=max
+      - name: Build y Push Frontend
+        run: |
+          docker build \
+            --build-arg VITE_API_URL=http://${{ secrets.ALB_DNS }} \
+            -f Dockerfile.front \
+            -t ${{ env.ECR_REGISTRY }}/innovatech-frontend:latest \
+            -t ${{ env.ECR_REGISTRY }}/innovatech-frontend:${{ github.sha }} \
+            ./front_despacho
+          docker push ${{ env.ECR_REGISTRY }}/innovatech-frontend:latest
+          docker push ${{ env.ECR_REGISTRY }}/innovatech-frontend:${{ github.sha }}
 
-      # ── Backend Despachos ───────────────────────────────────────
-      - name: Build imagen Backend Despachos
-        uses: docker/build-push-action@v5
-        with:
-          context: ./back-Despachos_SpringBoot/Springboot-API-REST-DESPACHO
-          file: ./Dockerfile.back-despachos
-          push: true
-          tags: |
-            ${{ env.ECR_REGISTRY }}/innovatech-back-despachos:latest
-            ${{ env.ECR_REGISTRY }}/innovatech-back-despachos:${{ github.sha }}
-          cache-from: type=gha
-          cache-to: type=gha,mode=max
+      - name: Build y Push Backend Despachos
+        run: |
+          docker build \
+            -f Dockerfile.back-despachos \
+            -t ${{ env.ECR_REGISTRY }}/innovatech-back-despachos:latest \
+            -t ${{ env.ECR_REGISTRY }}/innovatech-back-despachos:${{ github.sha }} \
+            ./back-Despachos_SpringBoot/Springboot-API-REST-DESPACHO
+          docker push ${{ env.ECR_REGISTRY }}/innovatech-back-despachos:latest
+          docker push ${{ env.ECR_REGISTRY }}/innovatech-back-despachos:${{ github.sha }}
 
-      # ── Backend Ventas ──────────────────────────────────────────
-      - name: Build imagen Backend Ventas
-        uses: docker/build-push-action@v5
-        with:
-          context: ./back-Ventas_SpringBoot/Springboot-API-REST
-          file: ./Dockerfile.back-ventas
-          push: true
-          tags: |
-            ${{ env.ECR_REGISTRY }}/innovatech-back-ventas:latest
-            ${{ env.ECR_REGISTRY }}/innovatech-back-ventas:${{ github.sha }}
-          cache-from: type=gha
-          cache-to: type=gha,mode=max
+      - name: Build y Push Backend Ventas
+        run: |
+          docker build \
+            -f Dockerfile.back-ventas \
+            -t ${{ env.ECR_REGISTRY }}/innovatech-back-ventas:latest \
+            -t ${{ env.ECR_REGISTRY }}/innovatech-back-ventas:${{ github.sha }} \
+            ./back-Ventas_SpringBoot/Springboot-API-REST
+          docker push ${{ env.ECR_REGISTRY }}/innovatech-back-ventas:latest
+          docker push ${{ env.ECR_REGISTRY }}/innovatech-back-ventas:${{ github.sha }}
 
-  # ─────────────────────────────────────────────────────────────────
-  # JOB 2: Deploy a ECS (solo en push a main)
-  # ─────────────────────────────────────────────────────────────────
   deploy:
     name: Deploy a ECS Fargate
     runs-on: ubuntu-latest
@@ -97,77 +81,32 @@ jobs:
           aws-session-token: ${{ secrets.AWS_SESSION_TOKEN }}
           aws-region: ${{ env.AWS_REGION }}
 
-      # ── Deploy Frontend ─────────────────────────────────────────
-      - name: Obtener Task Definition actual - Frontend
-        run: |
-          aws ecs describe-task-definition \
-            --task-definition innovatech-frontend \
-            --query taskDefinition > task-def-frontend.json
-
-      - name: Actualizar imagen en Task Definition - Frontend
-        id: task-def-frontend
-        uses: aws-actions/amazon-ecs-render-task-definition@v1
-        with:
-          task-definition: task-def-frontend.json
-          container-name: frontend
-          image: ${{ env.ECR_REGISTRY }}/innovatech-frontend:${{ github.sha }}
-
       - name: Deploy Frontend a ECS
-        uses: aws-actions/amazon-ecs-deploy-task-definition@v1
-        with:
-          task-definition: ${{ steps.task-def-frontend.outputs.task-definition }}
-          service: innovatech-frontend-service
-          cluster: ${{ env.ECS_CLUSTER }}
-          wait-for-service-stability: true
-
-      # ── Deploy Backend Despachos ────────────────────────────────
-      - name: Obtener Task Definition actual - Despachos
         run: |
-          aws ecs describe-task-definition \
-            --task-definition innovatech-back-despachos \
-            --query taskDefinition > task-def-despachos.json
-
-      - name: Actualizar imagen en Task Definition - Despachos
-        id: task-def-despachos
-        uses: aws-actions/amazon-ecs-render-task-definition@v1
-        with:
-          task-definition: task-def-despachos.json
-          container-name: back-despachos
-          image: ${{ env.ECR_REGISTRY }}/innovatech-back-despachos:${{ github.sha }}
+          aws ecs update-service \
+            --cluster ${{ env.ECS_CLUSTER }} \
+            --service innovatech-frontend-service \
+            --force-new-deployment \
+            --region ${{ env.AWS_REGION }}
 
       - name: Deploy Backend Despachos a ECS
-        uses: aws-actions/amazon-ecs-deploy-task-definition@v1
-        with:
-          task-definition: ${{ steps.task-def-despachos.outputs.task-definition }}
-          service: innovatech-despachos-service
-          cluster: ${{ env.ECS_CLUSTER }}
-          wait-for-service-stability: true
-
-      # ── Deploy Backend Ventas ───────────────────────────────────
-      - name: Obtener Task Definition actual - Ventas
         run: |
-          aws ecs describe-task-definition \
-            --task-definition innovatech-back-ventas \
-            --query taskDefinition > task-def-ventas.json
-
-      - name: Actualizar imagen en Task Definition - Ventas
-        id: task-def-ventas
-        uses: aws-actions/amazon-ecs-render-task-definition@v1
-        with:
-          task-definition: task-def-ventas.json
-          container-name: back-ventas
-          image: ${{ env.ECR_REGISTRY }}/innovatech-back-ventas:${{ github.sha }}
+          aws ecs update-service \
+            --cluster ${{ env.ECS_CLUSTER }} \
+            --service innovatech-despachos-service \
+            --force-new-deployment \
+            --region ${{ env.AWS_REGION }}
 
       - name: Deploy Backend Ventas a ECS
-        uses: aws-actions/amazon-ecs-deploy-task-definition@v1
-        with:
-          task-definition: ${{ steps.task-def-ventas.outputs.task-definition }}
-          service: innovatech-ventas-service
-          cluster: ${{ env.ECS_CLUSTER }}
-          wait-for-service-stability: true
+        run: |
+          aws ecs update-service \
+            --cluster ${{ env.ECS_CLUSTER }} \
+            --service innovatech-ventas-service \
+            --force-new-deployment \
+            --region ${{ env.AWS_REGION }}
 
       - name: Resumen del deploy
         run: |
-          echo "✅ Deploy completado exitosamente"
+          echo "Deploy completado"
           echo "Commit: ${{ github.sha }}"
           echo "URL: http://${{ secrets.ALB_DNS }}"
