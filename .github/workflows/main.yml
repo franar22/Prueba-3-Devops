@@ -1,21 +1,26 @@
 
 name: CI/CD - Innovatech Chile
+ 
 on:
   push:
     branches: [main]
   pull_request:
     branches: [main]
+ 
 env:
   AWS_REGION: us-east-1
   ECR_REGISTRY: ${{ secrets.AWS_ACCOUNT_ID }}.dkr.ecr.us-east-1.amazonaws.com
   ECS_CLUSTER: innovatech-cluster
+ 
 jobs:
   build-and-push:
     name: Build & Push a ECR
     runs-on: ubuntu-latest
+ 
     steps:
       - name: Checkout del código
         uses: actions/checkout@v4
+ 
       - name: Configurar credenciales AWS
         uses: aws-actions/configure-aws-credentials@v4
         with:
@@ -23,42 +28,49 @@ jobs:
           aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
           aws-session-token: ${{ secrets.AWS_SESSION_TOKEN }}
           aws-region: ${{ env.AWS_REGION }}
+ 
       - name: Login a Amazon ECR
         id: login-ecr
         uses: aws-actions/amazon-ecr-login@v2
+ 
       - name: Build y Push Frontend
         run: |
           docker build \
             --build-arg VITE_API_URL=http://${{ secrets.ALB_DNS }} \
             -t ${{ env.ECR_REGISTRY }}/innovatech-frontend:latest \
             -t ${{ env.ECR_REGISTRY }}/innovatech-frontend:${{ github.sha }} \
-            './proyecto semestral/front_despacho'
+            "./proyecto semestral/front_despacho"
           docker push ${{ env.ECR_REGISTRY }}/innovatech-frontend:latest
           docker push ${{ env.ECR_REGISTRY }}/innovatech-frontend:${{ github.sha }}
+ 
       - name: Build y Push Backend Despachos
         run: |
           docker build \
             -t ${{ env.ECR_REGISTRY }}/innovatech-back-despachos:latest \
             -t ${{ env.ECR_REGISTRY }}/innovatech-back-despachos:${{ github.sha }} \
-            './proyecto semestral/back-Despachos_SpringBoot/Springboot-API-REST-DESPACHO'
+            "./proyecto semestral/back-Despachos_SpringBoot/Springboot-API-REST-DESPACHO"
           docker push ${{ env.ECR_REGISTRY }}/innovatech-back-despachos:latest
           docker push ${{ env.ECR_REGISTRY }}/innovatech-back-despachos:${{ github.sha }}
+ 
       - name: Build y Push Backend Ventas
         run: |
           docker build \
             -t ${{ env.ECR_REGISTRY }}/innovatech-back-ventas:latest \
             -t ${{ env.ECR_REGISTRY }}/innovatech-back-ventas:${{ github.sha }} \
-            './proyecto semestral/back-Ventas_SpringBoot/Springboot-API-REST'
+            "./proyecto semestral/back-Ventas_SpringBoot/Springboot-API-REST"
           docker push ${{ env.ECR_REGISTRY }}/innovatech-back-ventas:latest
           docker push ${{ env.ECR_REGISTRY }}/innovatech-back-ventas:${{ github.sha }}
+ 
   deploy:
     name: Deploy a ECS Fargate
     runs-on: ubuntu-latest
     needs: build-and-push
     if: github.ref == 'refs/heads/main' && github.event_name == 'push'
+ 
     steps:
       - name: Checkout del código
         uses: actions/checkout@v4
+ 
       - name: Configurar credenciales AWS
         uses: aws-actions/configure-aws-credentials@v4
         with:
@@ -66,6 +78,7 @@ jobs:
           aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
           aws-session-token: ${{ secrets.AWS_SESSION_TOKEN }}
           aws-region: ${{ env.AWS_REGION }}
+ 
       - name: Deploy Frontend a ECS
         run: |
           aws ecs update-service \
@@ -73,6 +86,7 @@ jobs:
             --service innovatech-frontend-service \
             --force-new-deployment \
             --region ${{ env.AWS_REGION }}
+ 
       - name: Deploy Backend Despachos a ECS
         run: |
           aws ecs update-service \
@@ -80,6 +94,7 @@ jobs:
             --service innovatech-despachos-service \
             --force-new-deployment \
             --region ${{ env.AWS_REGION }}
+ 
       - name: Deploy Backend Ventas a ECS
         run: |
           aws ecs update-service \
@@ -87,6 +102,7 @@ jobs:
             --service innovatech-ventas-service \
             --force-new-deployment \
             --region ${{ env.AWS_REGION }}
+ 
       - name: Resumen del deploy
         run: |
           echo "Deploy completado"
